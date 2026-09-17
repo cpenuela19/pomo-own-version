@@ -43,6 +43,9 @@ type Model struct {
 	commandsWg       *sync.WaitGroup // post commands wg
 	commandsCancel   context.CancelFunc
 
+	// theming
+	accentColor lipgloss.TerminalColor // single source of truth for cfg.ASCIIArt.Color, shared by the timer digits and the help footer
+
 	// ASCII art
 	useTimerArt     bool
 	timerFont       ascii.Font
@@ -55,15 +58,21 @@ type Model struct {
 func NewModel(taskType config.TaskType, cfg config.Config) Model {
 	task := taskType.GetTask()
 
+	accentColor := colors.GetColor(cfg.ASCIIArt.Color)
+
 	var timerFont ascii.Font
 	timerStyle := lipgloss.NewStyle()
 
 	if cfg.ASCIIArt.Enabled {
 		timerFont = ascii.GetFont(cfg.ASCIIArt.Font)
-
-		timerColor := colors.GetColor(cfg.ASCIIArt.Color)
-		timerStyle = timerStyle.Foreground(timerColor)
+		timerStyle = timerStyle.Foreground(accentColor)
 	}
+
+	helpModel := help.New()
+	helpModel.Styles.ShortKey = helpModel.Styles.ShortKey.Foreground(accentColor)
+	helpModel.Styles.FullKey = helpModel.Styles.FullKey.Foreground(accentColor)
+	helpModel.Styles.ShortDesc = helpModel.Styles.ShortDesc.Foreground(lipgloss.Color("#FFFFFF"))
+	helpModel.Styles.FullDesc = helpModel.Styles.FullDesc.Foreground(lipgloss.Color("#FFFFFF"))
 
 	sessionSummary := summary.SessionSummary{}
 
@@ -84,7 +93,7 @@ func NewModel(taskType config.TaskType, cfg config.Config) Model {
 	return Model{
 		progressBar:   progress.New(progress.WithDefaultGradient()),
 		confirmDialog: confirm.New(),
-		help:          help.New(),
+		help:          helpModel,
 
 		timer:    timer.New(task.Duration),
 		duration: task.Duration,
@@ -96,6 +105,8 @@ func NewModel(taskType config.TaskType, cfg config.Config) Model {
 		sessionSummary:  sessionSummary,
 		longBreak:       cfg.LongBreak,
 		cyclePosition:   1,
+
+		accentColor: accentColor,
 
 		useTimerArt:     cfg.ASCIIArt.Enabled,
 		timerFont:       timerFont,
